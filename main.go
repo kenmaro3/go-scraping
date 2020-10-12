@@ -1,6 +1,5 @@
 package main
 
-
 import (
 	"encoding/csv"
 	"fmt"
@@ -9,21 +8,19 @@ import (
 
 	"github.com/PuerkitoBio/goquery"
 	iconv "github.com/djimenez/iconv-go"
-
 )
-
 
 var baseURL = "https://avex.jp/nissy/news/"
 
-type Article struct{
+type Article struct {
 	Title string
-	URL string
-	Date time.Time
+	URL   string
+	Date  time.Time
 }
 
 type ArticleList []Article
 
-func getList(url string) (ArticleList, error){
+func getList(url string) (ArticleList, error) {
 	articleList := make([]Article, 0)
 	doc, err := goquery.NewDocument(url)
 	if err != nil {
@@ -35,7 +32,7 @@ func getList(url string) (ArticleList, error){
 		article := Article{}
 		article.Title = s.Find("a").Text()
 		URI, _ := s.Find("a").Attr("href")
-		article.URL = baseURL + URL
+		article.URL = baseURL + URI
 		articleList = append(articleList, article)
 
 	})
@@ -47,7 +44,6 @@ func getList(url string) (ArticleList, error){
 
 	return articleList, nil
 }
-
 
 func (articleList ArticleList) exportCSV(filepath string) error {
 	file, err := os.Create(filepath)
@@ -77,7 +73,7 @@ func (articleList ArticleList) exportCSV(filepath string) error {
 
 func main() {
 	articleList, err := getList(baseURL)
-	if err!= nil{
+	if err != nil {
 		panic(err)
 
 	}
@@ -89,4 +85,3 @@ func main() {
 
 	fmt.Println("finish")
 }
-
