@@ -1,45 +1,92 @@
 package main
 
+
 import (
-	"net/http"
-	"sync"
-	"log"
+	"encoding/csv"
+	"fmt"
+	"os"
 	"time"
+
+	"github.com/PuerkitoBio/goquery"
+	iconv "github.com/djimenez/iconv-go"
+
 )
 
 
-func main() {
-	url := "http://localhost:8080"
+var baseURL = "https://avex.jp/nissy/news/"
 
-	maxConnection := make(chan bool, 10)
-	wg := &sync.WaitGroup{}
+type Article struct{
+	Title string
+	URL string
+	Date time.Time
+}
 
-	count := 0
-	start := time.Now()
+type ArticleList []Article
 
-	for maxRequest := 0; maxRequest < 10000; maxRequest ++ {
-		wg.Add(1)
-		maxConnection <- true
-		go func() {
-			defer wg.Done()
-
-			resp, err := http.Get(url)
-			if err != nil {
-				return
-			}
-
-			defer resp.Body.Close()
-
-			count ++
-
-			<-maxConnection
-		}()
+func getList(url string) (ArticleList, error){
+	articleList := make([]Article, 0)
+	doc, err := goquery.NewDocument(url)
+	if err != nil {
+		return nil, err
 
 	}
 
-	wg.Wait()
-	end := time.Now()
-	log.Println("%d request succeded", count)
-	log.Println("%f sec took ", (end.Sub(start)).Seconds())
+	doc.Find("dd").Each(func(_ int, s *goquery.Selection) {
+		article := Article{}
+		article.Title = s.Find("a").Text()
+		URI, _ := s.Find("a").Attr("href")
+		article.URL = baseURL + URL
+		articleList = append(articleList, article)
 
+	})
+
+	doc.Find("dt").Each(func(index int, s *goquery.Selection) {
+		date, _ := time.Parse("2006.01.02", s.Find("time").Text())
+		articleList[index].Date = date
+	})
+
+	return articleList, nil
 }
+
+
+func (articleList ArticleList) exportCSV(filepath string) error {
+	file, err := os.Create(filepath)
+	if err != nil {
+		return err
+	}
+
+	converter, err := iconv.NewWriter(file, "utf-8", "sjis")
+	if err != nil {
+		return err
+	}
+
+	writer := csv.NewWriter(converter)
+	header := []string{"date", "title", "URL"}
+	writer.Write(header)
+	for _, v := range articleList {
+		content := []string{
+			v.Date.Format("2006/01/02"),
+			v.Title,
+			v.URL,
+		}
+		writer.Write(content)
+	}
+	writer.Flush()
+	return nil
+}
+
+func main() {
+	articleList, err := getList(baseURL)
+	if err!= nil{
+		panic(err)
+
+	}
+
+	err = articleList.exportCSV("output.csv")
+	if err != nil {
+		panic(err)
+	}
+
+	fmt.Println("finish")
+}
+
